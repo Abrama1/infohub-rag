@@ -15,10 +15,18 @@ st.caption("Agent answers in Georgian and always includes the mandatory InfoHub 
 with st.expander("Mandatory citation line (always included)", expanded=False):
     st.code(MANDATORY_CITATION_LINE, language="text")
 
+colA, colB = st.columns([1, 4])
+with colA:
+    if st.button("Clear chat"):
+        st.session_state.history = []
+
 if "history" not in st.session_state:
     st.session_state.history = []
 
-q = st.text_input("Ask a question (any language). Answer will be in Georgian:", placeholder="e.g. VAT rules...")
+q = st.text_input(
+    "Ask a question (any language). Answer will be in Georgian:",
+    placeholder="e.g. VAT refund rules...",
+)
 
 col1, col2 = st.columns([1, 4])
 with col1:
@@ -30,11 +38,44 @@ if run and q.strip():
     res = answer(q.strip(), k=int(k))
     st.session_state.history.append((q.strip(), res))
 
+
+def render_sources(sources: list[dict]) -> None:
+    if not sources:
+        st.write("წყაროები: (რელევანტური წყაროები ვერ მოიძებნა)")
+        return
+
+    for s in sources:
+        title = s.get("title") or "Untitled"
+        url = s.get("url") or ""
+        page = s.get("page", None)
+        suffix = f" — გვერდი {page}" if page is not None else ""
+        st.markdown(f"- **{title}** — {url}{suffix}")
+
+
 for user_q, res in reversed(st.session_state.history):
     st.markdown("### Question")
     st.write(user_q)
+
+    meta = res.get("meta", {}) or {}
+    provider = meta.get("provider")
+    model_used = meta.get("model_used")
+    fallback_used = meta.get("fallback_used")
+    k_used = meta.get("k")
+
     st.markdown("### Answer")
-    st.write(res["answer"])
-    with st.expander("Sources (raw metadata)", expanded=False):
-        st.json(res["sources"])
+    st.write(res.get("answer", ""))
+
+    with st.expander("Run metadata", expanded=False):
+        st.write(
+            {
+                "provider": provider,
+                "model_used": model_used,
+                "fallback_used": fallback_used,
+                "k": k_used,
+            }
+        )
+
+    with st.expander("Sources", expanded=True):
+        render_sources(res.get("sources", []) or [])
+
     st.divider()
