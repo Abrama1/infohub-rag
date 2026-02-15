@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+# Ensure project root is on PYTHONPATH so "app" imports work reliably
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
 import streamlit as st
 from app.rag import answer
 from app.prompts import MANDATORY_CITATION_LINE
