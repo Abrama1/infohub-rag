@@ -22,6 +22,18 @@ def retrieve_stub(question: str, k: int = 6) -> tuple[list[str], list[Source]]:
     return [], []
 
 
+def _sources_block(sources: list[Source]) -> str:
+    if not sources:
+        return "წყაროები: (რელევანტური წყაროები ვერ მოიძებნა)"
+
+    lines: list[str] = []
+    for s in sources:
+        page_part = f" — გვერდი {s.page}" if s.page is not None else ""
+        lines.append(f"- {s.title} — {s.url}{page_part}")
+
+    return "წყაროები:\n" + "\n".join(lines)
+
+
 def answer(question: str, k: int = 6) -> dict[str, Any]:
     snippets, sources = retrieve_stub(question, k=k)
 
@@ -52,22 +64,24 @@ def answer(question: str, k: int = 6) -> dict[str, Any]:
             content = (
                 f"{MANDATORY_CITATION_LINE}\n\n"
                 "ამ ეტაპზე დოკუმენტების მოძიება/ინდექსაცია ჯერ არ არის ჩართული, ამიტომ "
-                "InfoHub-ის დოკუმენტებზე დაყრდნობით ზუსტი პასუხის გაცემას ვერ ვახერხებ.\n\n"
-                "წყაროები: (ჯერ არ არის ხელმისაწვდომი)"
+                "InfoHub-ის დოკუმენტებზე დაყრდნობით ზუსტი პასუხის გაცემას ვერ ვახერხებ."
             )
         else:
-            src_lines = []
-            for s in sources:
-                page_part = f" — გვერდი {s.page}" if s.page is not None else ""
-                src_lines.append(f"- {s.title} — {s.url}{page_part}")
-
             content = (
                 f"{MANDATORY_CITATION_LINE}\n\n"
                 "ქვემოთ მოყვანილია ნაპოვნი ამონარიდები. ჩართეთ LLM_PROVIDER, რომ პასუხი უფრო ბუნებრივი იყოს.\n\n"
                 + "\n\n".join(snippets[:3])
-                + "\n\nწყაროები:\n"
-                + "\n".join(src_lines)
             )
+
+    # ---- Compliance enforcement (always) ----
+    content = (content or "").strip()
+
+    if not content.startswith(MANDATORY_CITATION_LINE):
+        content = f"{MANDATORY_CITATION_LINE}\n\n{content}".strip()
+
+    # Ensure "წყაროები:" block exists in all cases
+    if "წყაროები" not in content:
+        content = f"{content}\n\n{_sources_block(sources)}".strip()
 
     return {
         "answer": content,
