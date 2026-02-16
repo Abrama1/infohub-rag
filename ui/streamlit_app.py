@@ -1,3 +1,19 @@
+import os
+import streamlit as st
+
+def _secrets_to_env() -> None:
+    try:
+        secrets = dict(st.secrets)  # works on Streamlit Cloud + local secrets.toml
+    except Exception:
+        return  # allows running locally without Streamlit secrets
+
+    for k, v in secrets.items():
+        if isinstance(v, (str, int, float, bool)):
+            os.environ.setdefault(k, str(v))
+
+_secrets_to_env()
+
+
 import sys
 from pathlib import Path
 
