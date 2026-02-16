@@ -87,6 +87,25 @@ def _build_context(snippets: list[str], max_chars: int = 12000) -> str:
 def answer(question: str, k: int = 12) -> dict[str, Any]:
     # Retrieve from index (hybrid retrieval lives in app.retrieval)
     retrieved = retrieve_chunks(question, k=k)
+    if not retrieved:
+        content = (
+            f"{MANDATORY_CITATION_LINE}\n\n"
+            "InfoHub-ის ინდექსში ამ კითხვასთან დაკავშირებული სანდო ამონარიდები ვერ მოიძებნა, ამიტომ "
+            "დოკუმენტებზე დაყრდნობით ზუსტი პასუხის გაცემას ვერ ვახერხებ."
+        )
+        content = _strip_model_sources_block(content)
+        content = f"{content}\n\n{_sources_block([])}".strip()
+        return {
+            "answer": content,
+            "sources": [],
+            "meta": {
+                "provider": settings.llm_provider,
+                "model_used": None,
+                "fallback_used": False,
+                "k": k,
+            },
+        }
+
     snippets = [c.text for c in retrieved]
     sources = [Source(title=c.title, url=c.url, page=getattr(c, "page", None)) for c in retrieved]
     sources = _dedup_sources(sources)
