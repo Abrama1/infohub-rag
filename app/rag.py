@@ -6,6 +6,7 @@ from typing import Any
 from app.prompts import SYSTEM_PROMPT, MANDATORY_CITATION_LINE
 from app.llm import chat_with_meta
 from app.settings import settings
+from app.retrieval import retrieve as retrieve_chunks
 
 
 @dataclass
@@ -13,14 +14,6 @@ class Source:
     title: str
     url: str
     page: int | None = None
-
-
-def retrieve_stub(question: str, k: int = 6) -> tuple[list[str], list[Source]]:
-    """
-    Placeholder retrieval.
-    We will replace this later with real vector DB retrieval from InfoHub documents.
-    """
-    return [], []
 
 
 def _sources_block(sources: list[Source]) -> str:
@@ -36,21 +29,24 @@ def _sources_block(sources: list[Source]) -> str:
 
 
 def answer(question: str, k: int = 6) -> dict[str, Any]:
-    snippets, sources = retrieve_stub(question, k=k)
+    # Retrieve real chunks from the index
+    retrieved = retrieve_chunks(question, k=k)
+    snippets = [c.text for c in retrieved]
+    sources = [Source(title=c.title, url=c.url, page=getattr(c, "page", None)) for c in retrieved]
 
-    context_text = "(no context yet — retrieval not implemented)"
+    context_text = "(no context yet — retrieval returned empty)"
     if snippets:
         context_text = "\n\n".join(snippets)
 
     user_prompt = f"""
-    Question:
-    {question}
-    
-    Context snippets from InfoHub:
-    {context_text}
-    
-    Return the final answer in Georgian following the rules.
-    """.strip()
+Question:
+{question}
+
+Context snippets from InfoHub:
+{context_text}
+
+Return the final answer in Georgian following the rules.
+""".strip()
 
     # Default meta (in case LLM fails and we fall back)
     llm_meta: dict[str, Any] = {
@@ -71,7 +67,7 @@ def answer(question: str, k: int = 6) -> dict[str, Any]:
         if not snippets:
             content = (
                 f"{MANDATORY_CITATION_LINE}\n\n"
-                "ამ ეტაპზე დოკუმენტების მოძიება/ინდექსაცია ჯერ არ არის ჩართული, ამიტომ "
+                "ამ ეტაპზე ინდექსში შესაბამისი ამონარიდები ვერ მოიძებნა, ამიტომ "
                 "InfoHub-ის დოკუმენტებზე დაყრდნობით ზუსტი პასუხის გაცემას ვერ ვახერხებ."
             )
         else:
