@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,7 +17,39 @@ class Source:
     page: int | None = None
 
 
+# Strip any model-written sources section so we can always render canonical links.
+_SOURCES_SPLIT_RE = re.compile(r"\n\s*(?:წყაროები|sources)\s*:\s*", flags=re.IGNORECASE)
+
+
+def _strip_model_sources_block(text: str) -> str:
+    """
+    If the model wrote a 'წყაროები:' or 'sources:' section, remove it.
+    We'll append our own deterministic sources block.
+    """
+    text = (text or "").strip()
+    parts = _SOURCES_SPLIT_RE.split(text, maxsplit=1)
+    return (parts[0] if parts else text).strip()
+
+
+def _dedup_sources(sources: list[Source]) -> list[Source]:
+    seen: set[tuple[str, str]] = set()
+    out: list[Source] = []
+    for s in sources:
+        url = (s.url or "").strip()
+        title = (s.title or "").strip()
+        if not url:
+            continue
+        key = (url, title)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(Source(title=title or "Untitled", url=url, page=s.page))
+    return out
+
+
 def _sources_block(sources: list[Source]) -> str:
+    sources = _dedup_sources(sources)
+
     if not sources:
         return "წყაროები: (რელევანტური წყაროები ვერ მოიძებნა)"
 
@@ -28,15 +61,37 @@ def _sources_block(sources: list[Source]) -> str:
     return "წყაროები:\n" + "\n".join(lines)
 
 
-def answer(question: str, k: int = 6) -> dict[str, Any]:
-    # Retrieve real chunks from the index
+def _build_context(snippets: list[str], max_chars: int = 12000) -> str:
+    """
+    Keep prompt sizes under control for rate-limits/TPM.
+    We retrieve k chunks, but only feed up to max_chars to the LLM.
+    """
+    if not snippets:
+        return "(no context — retrieval returned empty)"
+
+    buf: list[str] = []
+    total = 0
+    for s in snippets:
+        s = (s or "").strip()
+        if not s:
+            continue
+        # +2 for the \n\n join
+        if total + len(s) + 2 > max_chars:
+            break
+        buf.append(s)
+        total += len(s) + 2
+
+    return "\n\n".join(buf) if buf else "(no context — all retrieved snippets were empty)"
+
+
+def answer(question: str, k: int = 12) -> dict[str, Any]:
+    # Retrieve from index (hybrid retrieval lives in app.retrieval)
     retrieved = retrieve_chunks(question, k=k)
     snippets = [c.text for c in retrieved]
     sources = [Source(title=c.title, url=c.url, page=getattr(c, "page", None)) for c in retrieved]
+    sources = _dedup_sources(sources)
 
-    context_text = "(no context yet — retrieval returned empty)"
-    if snippets:
-        context_text = "\n\n".join(snippets)
+    context_text = _build_context(snippets, max_chars=12000)
 
     user_prompt = f"""
 Question:
@@ -46,6 +101,7 @@ Context snippets from InfoHub:
 {context_text}
 
 Return the final answer in Georgian following the rules.
+Do NOT include a 'წყაროები:' section; it will be added separately.
 """.strip()
 
     # Default meta (in case LLM fails and we fall back)
@@ -80,11 +136,13 @@ Return the final answer in Georgian following the rules.
     # ---- Compliance enforcement (always) ----
     content = (content or "").strip()
 
+    # Ensure mandatory citation line
     if not content.startswith(MANDATORY_CITATION_LINE):
         content = f"{MANDATORY_CITATION_LINE}\n\n{content}".strip()
 
-    if "წყაროები" not in content:
-        content = f"{content}\n\n{_sources_block(sources)}".strip()
+    # Remove any model-written sources block and ALWAYS append canonical sources.
+    content = _strip_model_sources_block(content)
+    content = f"{content}\n\n{_sources_block(sources)}".strip()
 
     return {
         "answer": content,
