@@ -30,7 +30,7 @@ q = st.text_input(
 
 col1, col2 = st.columns([1, 4])
 with col1:
-    k = st.number_input("Top-K", min_value=3, max_value=12, value=6, step=1)
+    k = st.number_input("Top-K (რეკომენდირებული: 12)", min_value=6, max_value=12, value=12, step=1)
 with col2:
     run = st.button("Ask")
 
