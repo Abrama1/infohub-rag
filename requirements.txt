@@ -4,3 +4,8 @@ streamlit
 python-dotenv
 pydantic-settings
 requests
+beautifulsoup4
+lxml
+tqdm
+chromadb
+sentence-transformers
