@@ -1,8 +1,14 @@
+from __future__ import annotations
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",  # IMPORTANT: don't crash on extra env keys
+    )
 
     # LLM provider: openai_compat | ollama | none
     llm_provider: str = "none"
@@ -10,19 +16,22 @@ class Settings(BaseSettings):
     # OpenAI-compatible API settings (Groq/Mistral/etc)
     llm_api_key: str | None = None
     llm_base_url: str = "https://api.openai.com/v1"
-    llm_model: str = "gpt-4o-mini"
-    llm_fallback_model: str | None = None  # e.g. llama-3.1-8b-instant
+    llm_model: str = "llama-3.3-70b-versatile"
+    llm_fallback_model: str = "llama-3.1-8b-instant"
 
     # Ollama settings (local)
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1:8b-instruct"
 
-    # Retrieval settings (later)
+    # Retrieval settings
     embedding_model: str = "intfloat/multilingual-e5-large"
     chroma_dir: str = "./data/index"
     chroma_collection: str = "infohub_docs"
 
-    # Optional cookie for authenticated InfoHub requests
+    # Index bootstrap (download zip from GitHub Releases)
+    index_url: str | None = None
+
+    # Optional cookie for authenticated InfoHub requests (later)
     infohub_cookie: str | None = None
 
 

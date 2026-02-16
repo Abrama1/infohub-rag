@@ -34,7 +34,9 @@ def ensure_chroma_index() -> bool:
     index_url = os.getenv("INDEX_URL", "").strip()
 
     sqlite_file = chroma_dir / "chroma.sqlite3"
-    if sqlite_file.exists():
+    MIN_SIZE = 5_000_000  # 5MB; your real one is ~82MB
+
+    if sqlite_file.exists() and sqlite_file.stat().st_size >= MIN_SIZE:
         return True
 
     if not index_url:
